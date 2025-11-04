@@ -272,6 +272,28 @@
             margin-left: 10px;
         }
 
+        .location-status {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .location-home {
+            background-color: rgba(76, 175, 80, 0.2);
+            color: var(--success);
+            border: 2px solid var(--success);
+        }
+
+        .location-outside {
+            background-color: rgba(255, 152, 0, 0.2);
+            color: var(--warning);
+            border: 2px solid var(--warning);
+        }
+
         @media (max-width: 768px) {
             .dashboard {
                 grid-template-columns: 1fr;
@@ -377,14 +399,36 @@
         const app = firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
 
+        // Home location coordinates
+        const HOME_LOCATION = {
+            latitude: 40.477583,
+            longitude: -3.708096
+        };
+        const HOME_RADIUS = 50; // meters
+
         // Initialize map
         let map = L.map('map').setView([0, 0], 2);
         let marker = null;
         let circle = null;
+        let homeMarker = null;
 
         // Add tile layer to map
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Add home marker to map
+        homeMarker = L.marker([HOME_LOCATION.latitude, HOME_LOCATION.longitude])
+            .addTo(map)
+            .bindPopup('Home Location')
+            .openPopup();
+        
+        // Add home radius circle
+        L.circle([HOME_LOCATION.latitude, HOME_LOCATION.longitude], {
+            color: 'green',
+            fillColor: '#30ff30',
+            fillOpacity: 0.2,
+            radius: HOME_RADIUS
         }).addTo(map);
 
         // Track the most recent session and its last update time
@@ -392,6 +436,32 @@
         let lastUpdateTime = null;
         let offlineTimer = null;
         const OFFLINE_THRESHOLD = 30000; // 30 seconds without updates = offline
+
+        // Function to calculate distance between two coordinates using Haversine formula
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Earth's radius in meters
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const distance = R * c;
+            return distance;
+        }
+
+        // Function to check if current location is within home area
+        function isAtHome(latitude, longitude) {
+            if (!latitude || !longitude) return false;
+            
+            const distance = calculateDistance(
+                latitude, longitude, 
+                HOME_LOCATION.latitude, HOME_LOCATION.longitude
+            );
+            
+            return distance <= HOME_RADIUS;
+        }
 
         // Function to update the map with new location
         function updateMap(latitude, longitude, accuracy) {
@@ -416,7 +486,9 @@
                 }).addTo(map);
             }
             
-            map.setView(newLatLng, 16);
+            // Center map to show both current location and home
+            const bounds = L.latLngBounds([newLatLng, [HOME_LOCATION.latitude, HOME_LOCATION.longitude]]);
+            map.fitBounds(bounds, { padding: [20, 20] });
         }
 
         // Function to format data for display
@@ -491,9 +563,19 @@
             // Reset offline timer since we received an update
             resetOfflineTimer();
 
+            // Check if location is at home
+            const atHome = isAtHome(locationData.latitude, locationData.longitude);
+            const locationStatus = atHome ? 
+                '<span class="location-status location-home"><i class="fas fa-home"></i> Home</span>' : 
+                '<span class="location-status location-outside"><i class="fas fa-external-link-alt"></i> Outside</span>';
+
             // Update location information
             const locationInfo = document.getElementById('location-info');
             locationInfo.innerHTML = `
+                <div class="data-item">
+                    <span class="data-label"><i class="fas fa-map-marker-alt"></i> Location:</span>
+                    <span class="data-value">${locationStatus}</span>
+                </div>
                 <div class="data-item">
                     <span class="data-label"><i class="fas fa-globe-americas"></i> Latitude:</span>
                     <span class="data-value">${formatData(locationData.latitude)}</span>
@@ -562,7 +644,22 @@
 
             // Update additional information
             const additionalInfo = document.getElementById('additional-info');
+            
+            // Calculate distance from home if we have valid coordinates
+            let distanceFromHome = 'N/A';
+            if (locationData.latitude && locationData.longitude) {
+                const distance = calculateDistance(
+                    locationData.latitude, locationData.longitude,
+                    HOME_LOCATION.latitude, HOME_LOCATION.longitude
+                );
+                distanceFromHome = `${Math.round(distance)} meters`;
+            }
+            
             additionalInfo.innerHTML = `
+                <div class="data-item">
+                    <span class="data-label"><i class="fas fa-home"></i> Distance from Home:</span>
+                    <span class="data-value">${distanceFromHome}</span>
+                </div>
                 <div class="data-item">
                     <span class="data-label"><i class="fas fa-clock"></i> Last Update:</span>
                     <span class="data-value">${formatTimestamp(locationData.timestamp)}</span>
