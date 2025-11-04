@@ -383,11 +383,11 @@
             document.getElementById('last-update').textContent = `Last updated: ${new Date().toLocaleString()}`;
         }
 
-        // Find and listen to active sessions
+        // Find and listen to active sessions - UPDATED TO GET MOST RECENT SESSION
         function findAndListenToActiveSessions() {
             console.log('Looking for active sessions...');
             
-            database.ref('sessions').orderByChild('isActive').equalTo(true).on('value', (sessionsSnapshot) => {
+            database.ref('sessions').orderByChild('lastUpdate').on('value', (sessionsSnapshot) => {
                 const sessions = sessionsSnapshot.val();
                 
                 if (!sessions) {
@@ -395,15 +395,26 @@
                     return;
                 }
 
-                // Get the first active session (you might want to handle multiple sessions differently)
-                const sessionId = Object.keys(sessions)[0];
-                const sessionData = sessions[sessionId];
+                // Find the session with the most recent lastUpdate timestamp
+                let mostRecentSessionId = null;
+                let mostRecentTimestamp = 0;
                 
-                console.log('Found active session:', sessionId, sessionData);
-                updateSessionInfo(sessionId, sessionData);
+                Object.keys(sessions).forEach(sessionId => {
+                    const sessionData = sessions[sessionId];
+                    if (sessionData.lastUpdate && sessionData.lastUpdate > mostRecentTimestamp) {
+                        mostRecentTimestamp = sessionData.lastUpdate;
+                        mostRecentSessionId = sessionId;
+                    }
+                });
 
-                // Listen to locations in this session
-                listenToSessionLocations(sessionId);
+                if (mostRecentSessionId) {
+                    const sessionData = sessions[mostRecentSessionId];
+                    console.log('Found most recent session:', mostRecentSessionId, sessionData);
+                    updateSessionInfo(mostRecentSessionId, sessionData);
+                    listenToSessionLocations(mostRecentSessionId);
+                } else {
+                    document.getElementById('session-info').innerHTML = '<div class="no-data">No active sessions found</div>';
+                }
             });
         }
 
