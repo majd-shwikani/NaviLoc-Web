@@ -159,6 +159,26 @@
         .session-item {
             margin: 5px 0;
         }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        
+        .connection-online {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .connection-offline {
+            background-color: #ffebee;
+            color: #c62828;
+        }
     </style>
 </head>
 <body>
@@ -238,6 +258,12 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
 
+        // Track the most recent session and its last update time
+        let currentSessionId = null;
+        let lastUpdateTime = null;
+        let offlineTimer = null;
+        const OFFLINE_THRESHOLD = 30000; // 30 seconds without updates = offline
+
         // Function to update the map with new location
         function updateMap(latitude, longitude, accuracy) {
             const newLatLng = new L.LatLng(latitude, longitude);
@@ -294,9 +320,49 @@
             `;
         }
 
+        // Function to update connection status
+        function updateConnectionStatus(isOnline) {
+            const sessionInfo = document.getElementById('session-info');
+            
+            // Add or update connection status indicator
+            let statusElement = document.getElementById('connection-status');
+            if (!statusElement) {
+                statusElement = document.createElement('div');
+                statusElement.id = 'connection-status';
+                sessionInfo.insertBefore(statusElement, sessionInfo.firstChild);
+            }
+            
+            if (isOnline) {
+                statusElement.className = 'connection-status connection-online';
+                statusElement.innerHTML = '<span class="status-indicator status-online"></span> Device is online and sending data';
+            } else {
+                statusElement.className = 'connection-status connection-offline';
+                statusElement.innerHTML = '<span class="status-indicator status-offline"></span> Device is offline - no recent updates';
+            }
+        }
+
+        // Function to reset the offline timer
+        function resetOfflineTimer() {
+            // Clear existing timer
+            if (offlineTimer) {
+                clearTimeout(offlineTimer);
+            }
+            
+            // Set device as online
+            updateConnectionStatus(true);
+            
+            // Set new timer to mark as offline if no updates received
+            offlineTimer = setTimeout(() => {
+                updateConnectionStatus(false);
+            }, OFFLINE_THRESHOLD);
+        }
+
         // Function to update the UI with location data
         function updateUI(locationData) {
             console.log('Updating UI with:', locationData);
+
+            // Reset offline timer since we received an update
+            resetOfflineTimer();
 
             // Update device information
             const deviceInfo = document.getElementById('device-info');
@@ -410,7 +476,14 @@
                 if (mostRecentSessionId) {
                     const sessionData = sessions[mostRecentSessionId];
                     console.log('Found most recent session:', mostRecentSessionId, sessionData);
-                    updateSessionInfo(mostRecentSessionId, sessionData);
+                    
+                    // If this is a new session, update our tracking
+                    if (currentSessionId !== mostRecentSessionId) {
+                        currentSessionId = mostRecentSessionId;
+                        updateSessionInfo(mostRecentSessionId, sessionData);
+                        resetOfflineTimer(); // Reset timer for new session
+                    }
+                    
                     listenToSessionLocations(mostRecentSessionId);
                 } else {
                     document.getElementById('session-info').innerHTML = '<div class="no-data">No active sessions found</div>';
