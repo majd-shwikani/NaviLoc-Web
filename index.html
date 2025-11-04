@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Location Tracker</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card h2 {
+            color: #2575fc;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .data-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .data-item:last-child {
+            border-bottom: none;
+        }
+
+        .data-label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .data-value {
+            font-weight: 500;
+            color: #2575fc;
+        }
+
+        #map-container {
+            grid-column: 1 / -1;
+            height: 500px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-online {
+            background-color: #4CAF50;
+        }
+
+        .status-offline {
+            background-color: #F44336;
+        }
+
+        .last-update {
+            text-align: center;
+            margin-top: 20px;
+            color: #777;
+            font-style: italic;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #777;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 20px;
+            color: #777;
+            font-style: italic;
+        }
+
+        .session-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .session-item {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Live Location Tracker</h1>
+            <p>Real-time tracking and data visualization</p>
+        </header>
+
+        <div id="session-info" class="session-info">
+            <div class="loading">Looking for active sessions...</div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <h2>Device Information</h2>
+                <div id="device-info">
+                    <div class="loading">Loading device information...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Location Details</h2>
+                <div id="location-info">
+                    <div class="loading">Loading location data...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Status & Connectivity</h2>
+                <div id="status-info">
+                    <div class="loading">Loading status information...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Additional Data</h2>
+                <div id="additional-info">
+                    <div class="loading">Loading additional data...</div>
+                </div>
+            </div>
+
+            <div id="map-container">
+                <div id="map"></div>
+            </div>
+        </div>
+
+        <div class="last-update" id="last-update">
+            Last updated: --
+        </div>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD8uuorPjc2KhPvRAhWJTyFneCQfK3SPkA",
+            authDomain: "naviloc-b4c80.firebaseapp.com",
+            databaseURL: "https://naviloc-b4c80-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "naviloc-b4c80",
+            storageBucket: "naviloc-b4c80.firebasestorage.app",
+            messagingSenderId: "711435361667",
+            appId: "1:711435361667:web:25ad0ac4e344934378eab6",
+            measurementId: "G-5MQQCZHY06"
+        };
+
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Initialize map
+        let map = L.map('map').setView([0, 0], 2);
+        let marker = null;
+        let circle = null;
+
+        // Add tile layer to map
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Function to update the map with new location
+        function updateMap(latitude, longitude, accuracy) {
+            const newLatLng = new L.LatLng(latitude, longitude);
+            
+            if (marker) {
+                marker.setLatLng(newLatLng);
+            } else {
+                marker = L.marker(newLatLng).addTo(map);
+            }
+            
+            if (circle) {
+                map.removeLayer(circle);
+            }
+            
+            if (accuracy) {
+                circle = L.circle(newLatLng, {
+                    radius: accuracy,
+                    color: '#2575fc',
+                    fillColor: '#2575fc',
+                    fillOpacity: 0.2
+                }).addTo(map);
+            }
+            
+            map.setView(newLatLng, 16);
+        }
+
+        // Function to format data for display
+        function formatData(data) {
+            if (data === null || data === undefined) {
+                return 'N/A';
+            }
+            if (typeof data === 'object') {
+                return JSON.stringify(data, null, 2);
+            }
+            return data;
+        }
+
+        // Function to format timestamp
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp);
+            return date.toLocaleString();
+        }
+
+        // Function to update session info
+        function updateSessionInfo(sessionId, sessionData) {
+            const sessionInfo = document.getElementById('session-info');
+            sessionInfo.innerHTML = `
+                <h3>Active Session</h3>
+                <div class="session-item"><strong>Session ID:</strong> ${sessionId}</div>
+                <div class="session-item"><strong>Device:</strong> ${formatData(sessionData.deviceName)}</div>
+                <div class="session-item"><strong>Last Update:</strong> ${formatTimestamp(sessionData.lastUpdate)}</div>
+                <div class="session-item"><strong>Total Points:</strong> ${formatData(sessionData.totalPoints)}</div>
+            `;
+        }
+
+        // Function to update the UI with location data
+        function updateUI(locationData) {
+            console.log('Updating UI with:', locationData);
+
+            // Update device information
+            const deviceInfo = document.getElementById('device-info');
+            deviceInfo.innerHTML = `
+                <div class="data-item">
+                    <span class="data-label">Device Name:</span>
+                    <span class="data-value">${formatData(locationData.deviceName)}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Device ID:</span>
+                    <span class="data-value">${formatData(locationData.deviceName)}</span>
+                </div>
+            `;
+
+            // Update location information
+            const locationInfo = document.getElementById('location-info');
+            locationInfo.innerHTML = `
+                <div class="data-item">
+                    <span class="data-label">Latitude:</span>
+                    <span class="data-value">${formatData(locationData.latitude)}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Longitude:</span>
+                    <span class="data-value">${formatData(locationData.longitude)}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Altitude:</span>
+                    <span class="data-value">${formatData(locationData.altitude)} meters</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Speed:</span>
+                    <span class="data-value">${formatData(locationData.speed)} m/s</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Heading:</span>
+                    <span class="data-value">${formatData(locationData.heading)}°</span>
+                </div>
+            `;
+
+            // Update status information
+            const statusInfo = document.getElementById('status-info');
+            const isOnline = locationData.timestamp && (Date.now() - locationData.timestamp) < 300000; // 5 minutes
+            statusInfo.innerHTML = `
+                <div class="data-item">
+                    <span class="data-label">Status:</span>
+                    <span class="data-value">
+                        <span class="status-indicator ${isOnline ? 'status-online' : 'status-offline'}"></span>
+                        ${isOnline ? 'Online' : 'Offline'}
+                    </span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Battery Level:</span>
+                    <span class="data-value">${formatData(locationData.battery)}%</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">GPS Fix:</span>
+                    <span class="data-value">${locationData.gpsFix ? 'Yes' : 'No'}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">Satellites:</span>
+                    <span class="data-value">${formatData(locationData.satellites)}</span>
+                </div>
+            `;
+
+            // Update additional information
+            const additionalInfo = document.getElementById('additional-info');
+            additionalInfo.innerHTML = `
+                <div class="data-item">
+                    <span class="data-label">Timestamp:</span>
+                    <span class="data-value">${formatTimestamp(locationData.timestamp)}</span>
+                </div>
+            `;
+
+            // Update map if we have valid location data
+            if (locationData.latitude && locationData.longitude && locationData.gpsFix) {
+                updateMap(
+                    locationData.latitude, 
+                    locationData.longitude, 
+                    locationData.accuracy || 50 // Default accuracy if not provided
+                );
+            }
+
+            // Update last update time
+            document.getElementById('last-update').textContent = `Last updated: ${new Date().toLocaleString()}`;
+        }
+
+        // Find and listen to active sessions
+        function findAndListenToActiveSessions() {
+            console.log('Looking for active sessions...');
+            
+            database.ref('sessions').orderByChild('isActive').equalTo(true).on('value', (sessionsSnapshot) => {
+                const sessions = sessionsSnapshot.val();
+                
+                if (!sessions) {
+                    document.getElementById('session-info').innerHTML = '<div class="no-data">No active sessions found</div>';
+                    return;
+                }
+
+                // Get the first active session (you might want to handle multiple sessions differently)
+                const sessionId = Object.keys(sessions)[0];
+                const sessionData = sessions[sessionId];
+                
+                console.log('Found active session:', sessionId, sessionData);
+                updateSessionInfo(sessionId, sessionData);
+
+                // Listen to locations in this session
+                listenToSessionLocations(sessionId);
+            });
+        }
+
+        // Listen to location updates in a specific session
+        function listenToSessionLocations(sessionId) {
+            console.log('Listening to session:', sessionId);
+            
+            database.ref(`sessions/${sessionId}/locations`).orderByKey().limitToLast(1).on('child_added', (locationSnapshot) => {
+                const locationData = locationSnapshot.val();
+                console.log('New location data:', locationData);
+                updateUI(locationData);
+            });
+
+            // Also listen for the latest location
+            database.ref(`sessions/${sessionId}/locations`).orderByKey().limitToLast(1).on('value', (locationSnapshot) => {
+                const locations = locationSnapshot.val();
+                if (locations) {
+                    const latestLocationKey = Object.keys(locations)[0];
+                    const latestLocation = locations[latestLocationKey];
+                    console.log('Latest location:', latestLocation);
+                    updateUI(latestLocation);
+                }
+            });
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            findAndListenToActiveSessions();
+        });
+    </script>
+</body>
+</html>
