@@ -391,8 +391,8 @@
         let latestLocation = null;
         let mapCenteredOnFirstLocation = false;
         let offlineTimer = null;
-        let isDeviceRealTimeOnline = false;
-        const OFFLINE_THRESHOLD = 20000; // 20 seconds without updates = offline
+        let currentSessionId = null;
+        const OFFLINE_THRESHOLD = 30000; // 30 seconds without updates = offline
 
         // Initialize map
         let map = L.map('map').setView([HOME_LOCATION.latitude, HOME_LOCATION.longitude], 12); 
@@ -527,12 +527,8 @@
                 clearTimeout(offlineTimer);
             }
             
-            // Set device as online
-            isDeviceRealTimeOnline = true;
-            
-            // Set new timer to mark as offline if no updates received after 20 seconds
+            // Set new timer to mark as offline if no updates received
             offlineTimer = setTimeout(() => {
-                isDeviceRealTimeOnline = false;
                 // Force a UI update to reflect the new offline status in the Device Status card
                 if (latestLocation) {
                     updateUI(latestLocation); 
@@ -576,6 +572,9 @@
                 }
             }
 
+            // Check if device is online based on timestamp
+            const isOnline = locationData.timestamp && (Date.now() - locationData.timestamp) < OFFLINE_THRESHOLD;
+
             // Update location information (7 data items: Position + Movement + Status)
             const locationInfo = document.getElementById('location-info');
             locationInfo.innerHTML = `
@@ -609,9 +608,6 @@
                 </div>
             `;
 
-            // Use the real-time status for the connection indicator
-            const connectionStatus = isDeviceRealTimeOnline; 
-
             // Update device information (5 data items: Time + Hardware Status)
             const deviceInfo = document.getElementById('device-info');
             deviceInfo.innerHTML = `
@@ -632,8 +628,8 @@
                 <div class="data-item">
                     <span class="data-label"><i class="fas fa-network-wired"></i> Connection:</span>
                     <span class="data-value">
-                        <span class="status-indicator ${connectionStatus ? 'status-online' : 'status-offline'}"></span>
-                        ${connectionStatus ? 'Online' : 'Offline'}
+                        <span class="status-indicator ${isOnline ? 'status-online' : 'status-offline'}"></span>
+                        ${isOnline ? 'Online' : 'Offline'}
                     </span>
                 </div>
                 <div class="data-item">
