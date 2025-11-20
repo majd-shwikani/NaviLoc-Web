@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE >
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -10,6 +10,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        /* --- General and Layout Styles --- */
         * {
             margin: 0;
             padding: 0;
@@ -39,7 +40,8 @@
 
         .container {
             max-width: 1200px;
-            margin: 0 auto;
+            /* CENTERING: This ensures the entire content block is centered */
+            margin: 0 auto; 
             padding: 20px;
         }
 
@@ -68,8 +70,11 @@
 
         .dashboard {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            /* SIZING: Ensures cards are equal size (width) and fill space evenly */
+            grid-template-columns: repeat(2, 1fr); 
             gap: 20px;
+            /* SIZING: Ensures equal height for direct children (cards) in the grid, though content length will cause minor differences */
+            align-items: stretch;
         }
 
         .card {
@@ -80,6 +85,8 @@
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             position: relative;
             overflow: hidden;
+            /* Setting a minimum height for visual stability on load */
+            min-height: 250px; 
         }
 
         .card::before {
@@ -137,7 +144,8 @@
         }
 
         #map-container {
-            grid-column: 1 / -1;
+            /* Ensures the map spans the full width of the dashboard grid */
+            grid-column: 1 / -1; 
             height: 500px;
             border-radius: 20px;
             overflow: hidden;
@@ -191,46 +199,7 @@
             color: var(--text-light);
             font-style: italic;
         }
-
-        .session-info {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-            backdrop-filter: blur(5px);
-        }
-
-        .session-item {
-            margin: 10px 0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
         
-        .connection-status {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 15px;
-            border-radius: 15px;
-            margin-bottom: 20px;
-            font-weight: bold;
-            gap: 10px;
-        }
-        
-        .connection-online {
-            background-color: rgba(76, 175, 80, 0.2);
-            color: var(--success);
-            border: 2px solid var(--success);
-        }
-        
-        .connection-offline {
-            background-color: rgba(244, 67, 54, 0.2);
-            color: var(--danger);
-            border: 2px solid var(--danger);
-        }
-
         .battery-container {
             width: 60px;
             height: 30px;
@@ -294,13 +263,35 @@
             border: 2px solid var(--warning);
         }
 
+        /* Styles for the Center Map Button */
+        .leaflet-control-center-location a {
+            font-size: 18px;
+            text-align: center;
+            line-height: 30px;
+            height: 30px;
+            width: 30px;
+            border-radius: 4px;
+            color: var(--dark);
+            background-color: var(--card-bg);
+            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+            transition: all 0.2s ease;
+        }
+
+        .leaflet-control-center-location a:hover {
+            background-color: #eee;
+            color: var(--primary);
+        }
+
+        /* --- Media Queries --- */
         @media (max-width: 768px) {
             .dashboard {
-                grid-template-columns: 1fr;
+                /* Ensures cards stack when screen is too small */
+                grid-template-columns: 1fr; 
             }
             
             #map-container {
-                height: 300px;
+                /* MODIFIED: Increased height for better mobile viewing */
+                height: 450px; 
             }
             
             header h1 {
@@ -339,36 +330,26 @@
             <p>Real-time tracking and data visualization</p>
         </header>
 
-        <div id="session-info" class="session-info">
-            <div class="loading">Looking for active sessions...</div>
-        </div>
-
         <div class="dashboard">
             <div class="card">
                 <h2><i class="fas fa-map-pin"></i> Location Details</h2>
                 <div id="location-info">
-                    <div class="loading">Loading location data...</div>
-                </div>
-            </div>
-
-            <div class="card">
-                <h2><i class="fas fa-satellite"></i> GPS Status</h2>
-                <div id="status-info">
-                    <div class="loading">Loading status information...</div>
+                    <div class="loading">
+                        Loading location data...<br>
+                        <i class="fas fa-spinner fa-pulse"></i>
+                        <br><br><br><br><br>
+                    </div>
                 </div>
             </div>
 
             <div class="card">
                 <h2><i class="fas fa-battery-three-quarters"></i> Device Status</h2>
                 <div id="device-info">
-                    <div class="loading">Loading device information...</div>
-                </div>
-            </div>
-
-            <div class="card">
-                <h2><i class="fas fa-info-circle"></i> Additional Data</h2>
-                <div id="additional-info">
-                    <div class="loading">Loading additional data...</div>
+                    <div class="loading">
+                        Loading device information...<br>
+                        <i class="fas fa-spinner fa-pulse"></i>
+                        <br><br>
+                    </div>
                 </div>
             </div>
 
@@ -406,8 +387,15 @@
         };
         const HOME_RADIUS = 50; // meters
 
+        // Global variables
+        let latestLocation = null;
+        let mapCenteredOnFirstLocation = false;
+        let offlineTimer = null;
+        let isDeviceRealTimeOnline = false;
+        const OFFLINE_THRESHOLD = 20000; // 20 seconds without updates = offline
+
         // Initialize map
-        let map = L.map('map').setView([0, 0], 2);
+        let map = L.map('map').setView([HOME_LOCATION.latitude, HOME_LOCATION.longitude], 12); 
         let marker = null;
         let circle = null;
         let homeMarker = null;
@@ -431,11 +419,35 @@
             radius: HOME_RADIUS
         }).addTo(map);
 
-        // Track the most recent session and its last update time
-        let currentSessionId = null;
-        let lastUpdateTime = null;
-        let offlineTimer = null;
-        const OFFLINE_THRESHOLD = 30000; // 30 seconds without updates = offline
+        // --- Custom Control for Centering Map ---
+        const CenterControl = L.Control.extend({
+            onAdd: function(map) {
+                const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-center-location');
+                const button = L.DomUtil.create('a', 'leaflet-bar-part', container);
+                button.innerHTML = '<i class="fas fa-location-arrow"></i>';
+                button.href = '#';
+                button.title = 'Center Map to Current Location';
+
+                L.DomEvent.disableClickPropagation(button);
+                L.DomEvent.on(button, 'click', this._centerMap, this);
+
+                return container;
+            },
+
+            _centerMap: function(e) {
+                L.DomEvent.stop(e);
+                if (latestLocation && latestLocation.latitude && latestLocation.longitude) {
+                    // Center the map and zoom in to a reasonable level if it's currently zoomed out
+                    map.setView([latestLocation.latitude, latestLocation.longitude], map.getZoom() < 15 ? 15 : map.getZoom());
+                } else {
+                    alert('Location data is not available yet.');
+                }
+            }
+        });
+
+        // Add the custom control to the map
+        map.addControl(new CenterControl({ position: 'topright' }));
+        // --- End Custom Control ---
 
         // Function to calculate distance between two coordinates using Haversine formula
         function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -444,11 +456,10 @@
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = 
                 Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-                Math.sin(dLon/2) * Math.sin(dLon/2);
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             const distance = R * c;
-            return distance;
+            return distance; // Returns distance in meters
         }
 
         // Function to check if current location is within home area
@@ -463,7 +474,7 @@
             return distance <= HOME_RADIUS;
         }
 
-        // Function to update the map with new location
+        // Function to update the map with new location (only moves marker/circle)
         function updateMap(latitude, longitude, accuracy) {
             const newLatLng = new L.LatLng(latitude, longitude);
             
@@ -485,10 +496,6 @@
                     fillOpacity: 0.2
                 }).addTo(map);
             }
-            
-            // Center map to show both current location and home
-            const bounds = L.latLngBounds([newLatLng, [HOME_LOCATION.latitude, HOME_LOCATION.longitude]]);
-            map.fitBounds(bounds, { padding: [20, 20] });
         }
 
         // Function to format data for display
@@ -498,6 +505,10 @@
             }
             if (typeof data === 'object') {
                 return JSON.stringify(data, null, 2);
+            }
+            // Ensure numbers are rounded for display clarity
+            if (typeof data === 'number') {
+                 return parseFloat(data.toFixed(2));
             }
             return data;
         }
@@ -509,37 +520,6 @@
             return date.toLocaleString();
         }
 
-        // Function to update session info
-        function updateSessionInfo(sessionId, sessionData) {
-            const sessionInfo = document.getElementById('session-info');
-            sessionInfo.innerHTML = `
-                <h3>Active Tracking Session</h3>
-                <div class="session-item"><i class="fas fa-clock"></i> <strong>Last Update:</strong> ${formatTimestamp(sessionData.lastUpdate)}</div>
-                <div class="session-item"><i class="fas fa-map-marked-alt"></i> <strong>Total Points:</strong> ${formatData(sessionData.totalPoints)}</div>
-            `;
-        }
-
-        // Function to update connection status
-        function updateConnectionStatus(isOnline) {
-            const sessionInfo = document.getElementById('session-info');
-            
-            // Add or update connection status indicator
-            let statusElement = document.getElementById('connection-status');
-            if (!statusElement) {
-                statusElement = document.createElement('div');
-                statusElement.id = 'connection-status';
-                sessionInfo.insertBefore(statusElement, sessionInfo.firstChild);
-            }
-            
-            if (isOnline) {
-                statusElement.className = 'connection-status connection-online';
-                statusElement.innerHTML = '<i class="fas fa-wifi"></i> Device is online and sending data';
-            } else {
-                statusElement.className = 'connection-status connection-offline';
-                statusElement.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Device is offline - no recent updates';
-            }
-        }
-
         // Function to reset the offline timer
         function resetOfflineTimer() {
             // Clear existing timer
@@ -548,11 +528,15 @@
             }
             
             // Set device as online
-            updateConnectionStatus(true);
+            isDeviceRealTimeOnline = true;
             
-            // Set new timer to mark as offline if no updates received
+            // Set new timer to mark as offline if no updates received after 20 seconds
             offlineTimer = setTimeout(() => {
-                updateConnectionStatus(false);
+                isDeviceRealTimeOnline = false;
+                // Force a UI update to reflect the new offline status in the Device Status card
+                if (latestLocation) {
+                    updateUI(latestLocation); 
+                }
             }, OFFLINE_THRESHOLD);
         }
 
@@ -560,8 +544,15 @@
         function updateUI(locationData) {
             console.log('Updating UI with:', locationData);
 
-            // Reset offline timer since we received an update
+            // Store the latest location data globally for the center button and offline status update
+            latestLocation = locationData;
+
+            // Reset offline timer every time new data arrives.
             resetOfflineTimer();
+            
+            // Speed value from Firebase, assumed to be in km/h
+            const speedKmh = locationData.speed || 0;
+            const speedDisplay = formatData(speedKmh);
 
             // Check if location is at home
             const atHome = isAtHome(locationData.latitude, locationData.longitude);
@@ -569,12 +560,40 @@
                 '<span class="location-status location-home"><i class="fas fa-home"></i> Home</span>' : 
                 '<span class="location-status location-outside"><i class="fas fa-external-link-alt"></i> Outside</span>';
 
-            // Update location information
+            // --- Distance from Home Calculation (m to km) ---
+            let distanceFromHome = 'N/A';
+            if (locationData.latitude && locationData.longitude) {
+                const distanceMeters = calculateDistance(
+                    locationData.latitude, locationData.longitude,
+                    HOME_LOCATION.latitude, HOME_LOCATION.longitude
+                );
+                
+                if (distanceMeters >= 1000) {
+                    const distanceKm = (distanceMeters / 1000).toFixed(2);
+                    distanceFromHome = `${distanceKm} km`;
+                } else {
+                    distanceFromHome = `${Math.round(distanceMeters)} meters`;
+                }
+            }
+
+            // Update location information (7 data items: Position + Movement + Status)
             const locationInfo = document.getElementById('location-info');
             locationInfo.innerHTML = `
                 <div class="data-item">
-                    <span class="data-label"><i class="fas fa-map-marker-alt"></i> Location:</span>
+                    <span class="data-label"><i class="fas fa-map-marker-alt"></i> Location Status:</span>
                     <span class="data-value">${locationStatus}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label"><i class="fas fa-home"></i> Distance from Home:</span>
+                    <span class="data-value">${distanceFromHome}</span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label"><i class="fas fa-tachometer-alt"></i> Speed:</span>
+                    <span class="data-value">${speedDisplay} km/h <span class="speed-indicator">${Math.round(speedKmh)}</span></span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label"><i class="fas fa-compass"></i> Heading:</span>
+                    <span class="data-value">${formatData(locationData.heading)}°</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label"><i class="fas fa-globe-americas"></i> Latitude:</span>
@@ -588,40 +607,17 @@
                     <span class="data-label"><i class="fas fa-mountain"></i> Altitude:</span>
                     <span class="data-value">${formatData(locationData.altitude)} meters</span>
                 </div>
-                <div class="data-item">
-                    <span class="data-label"><i class="fas fa-tachometer-alt"></i> Speed:</span>
-                    <span class="data-value">${formatData(locationData.speed)} m/s <span class="speed-indicator">${Math.round(locationData.speed || 0)}</span></span>
-                </div>
-                <div class="data-item">
-                    <span class="data-label"><i class="fas fa-compass"></i> Heading:</span>
-                    <span class="data-value">${formatData(locationData.heading)}°</span>
-                </div>
             `;
 
-            // Update status information
-            const statusInfo = document.getElementById('status-info');
-            const isOnline = locationData.timestamp && (Date.now() - locationData.timestamp) < 300000; // 5 minutes
-            statusInfo.innerHTML = `
-                <div class="data-item">
-                    <span class="data-label"><i class="fas fa-signal"></i> GPS Fix:</span>
-                    <span class="data-value">${locationData.gpsFix ? '<i class="fas fa-check-circle" style="color: var(--success);"></i> Yes' : '<i class="fas fa-times-circle" style="color: var(--danger);"></i> No'}</span>
-                </div>
-                <div class="data-item">
-                    <span class="data-label"><i class="fas fa-satellite-dish"></i> Satellites:</span>
-                    <span class="data-value">${formatData(locationData.satellites)}</span>
-                </div>
-                <div class="data-item">
-                    <span class="data-label"><i class="fas fa-broadcast-tower"></i> Accuracy:</span>
-                    <span class="data-value">${formatData(locationData.accuracy)} meters</span>
-                </div>
-            `;
+            // Use the real-time status for the connection indicator
+            const connectionStatus = isDeviceRealTimeOnline; 
 
-            // Update device information
+            // Update device information (5 data items: Time + Hardware Status)
             const deviceInfo = document.getElementById('device-info');
             deviceInfo.innerHTML = `
                 <div class="data-item">
-                    <span class="data-label"><i class="fas fa-tablet-alt"></i> Device:</span>
-                    <span class="data-value">${formatData(locationData.deviceName)}</span>
+                    <span class="data-label"><i class="fas fa-clock"></i> Last Update:</span>
+                    <span class="data-value">${formatTimestamp(locationData.timestamp)}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label"><i class="fas fa-battery-three-quarters"></i> Battery:</span>
@@ -636,33 +632,17 @@
                 <div class="data-item">
                     <span class="data-label"><i class="fas fa-network-wired"></i> Connection:</span>
                     <span class="data-value">
-                        <span class="status-indicator ${isOnline ? 'status-online' : 'status-offline'}"></span>
-                        ${isOnline ? 'Online' : 'Offline'}
+                        <span class="status-indicator ${connectionStatus ? 'status-online' : 'status-offline'}"></span>
+                        ${connectionStatus ? 'Online' : 'Offline'}
                     </span>
                 </div>
-            `;
-
-            // Update additional information
-            const additionalInfo = document.getElementById('additional-info');
-            
-            // Calculate distance from home if we have valid coordinates
-            let distanceFromHome = 'N/A';
-            if (locationData.latitude && locationData.longitude) {
-                const distance = calculateDistance(
-                    locationData.latitude, locationData.longitude,
-                    HOME_LOCATION.latitude, HOME_LOCATION.longitude
-                );
-                distanceFromHome = `${Math.round(distance)} meters`;
-            }
-            
-            additionalInfo.innerHTML = `
                 <div class="data-item">
-                    <span class="data-label"><i class="fas fa-home"></i> Distance from Home:</span>
-                    <span class="data-value">${distanceFromHome}</span>
+                    <span class="data-label"><i class="fas fa-signal"></i> GPS Fix:</span>
+                    <span class="data-value">${locationData.gpsFix ? '<i class="fas fa-check-circle" style="color: var(--success);"></i> Yes' : '<i class="fas fa-times-circle" style="color: var(--danger);"></i> No'}</span>
                 </div>
                 <div class="data-item">
-                    <span class="data-label"><i class="fas fa-clock"></i> Last Update:</span>
-                    <span class="data-value">${formatTimestamp(locationData.timestamp)}</span>
+                    <span class="data-label"><i class="fas fa-satellite-dish"></i> Satellites:</span>
+                    <span class="data-value">${formatData(locationData.satellites)}</span>
                 </div>
             `;
 
@@ -673,9 +653,17 @@
                     locationData.longitude, 
                     locationData.accuracy || 50 // Default accuracy if not provided
                 );
+                
+                // --- Initial Map Centering Logic ---
+                if (!mapCenteredOnFirstLocation) {
+                    // Zoom to 15 for a good street-level view
+                    map.setView([locationData.latitude, locationData.longitude], 15);
+                    mapCenteredOnFirstLocation = true;
+                }
+                // --- End Initial Map Centering Logic ---
             }
 
-            // Update last update time
+            // Update last update time (the external footer element)
             document.getElementById('last-update').textContent = `Last updated: ${new Date().toLocaleString()}`;
         }
 
@@ -687,7 +675,9 @@
                 const sessions = sessionsSnapshot.val();
                 
                 if (!sessions) {
-                    document.getElementById('session-info').innerHTML = '<div class="no-data">No active sessions found</div>';
+                    // If no sessions, display a general "no data" message
+                    document.getElementById('location-info').innerHTML = '<div class="no-data">No active sessions or data found.</div>';
+                    document.getElementById('device-info').innerHTML = '<div class="no-data">No active sessions or data found.</div>';
                     return;
                 }
 
@@ -704,19 +694,13 @@
                 });
 
                 if (mostRecentSessionId) {
-                    const sessionData = sessions[mostRecentSessionId];
-                    console.log('Found most recent session:', mostRecentSessionId, sessionData);
+                    console.log('Found most recent session:', mostRecentSessionId);
                     
-                    // If this is a new session, update our tracking
-                    if (currentSessionId !== mostRecentSessionId) {
-                        currentSessionId = mostRecentSessionId;
-                        updateSessionInfo(mostRecentSessionId, sessionData);
-                        resetOfflineTimer(); // Reset timer for new session
-                    }
-                    
+                    // Start listening to locations for the most recent session
                     listenToSessionLocations(mostRecentSessionId);
                 } else {
-                    document.getElementById('session-info').innerHTML = '<div class="no-data">No active sessions found</div>';
+                    document.getElementById('location-info').innerHTML = '<div class="no-data">No active sessions or data found.</div>';
+                    document.getElementById('device-info').innerHTML = '<div class="no-data">No active sessions or data found.</div>';
                 }
             });
         }
@@ -725,13 +709,7 @@
         function listenToSessionLocations(sessionId) {
             console.log('Listening to session:', sessionId);
             
-            database.ref(`sessions/${sessionId}/locations`).orderByKey().limitToLast(1).on('child_added', (locationSnapshot) => {
-                const locationData = locationSnapshot.val();
-                console.log('New location data:', locationData);
-                updateUI(locationData);
-            });
-
-            // Also listen for the latest location
+            // Listen for the latest location only (since only the latest point matters for the map)
             database.ref(`sessions/${sessionId}/locations`).orderByKey().limitToLast(1).on('value', (locationSnapshot) => {
                 const locations = locationSnapshot.val();
                 if (locations) {
