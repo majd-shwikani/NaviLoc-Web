@@ -1,16 +1,16 @@
-<!DOCTYPE >
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Location Tracker</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* --- General and Layout Styles --- */
         * {
             margin: 0;
             padding: 0;
@@ -38,10 +38,112 @@
             min-height: 100vh;
         }
 
+        /* Login Screen Styles */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-box {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .login-box h1 {
+            color: var(--primary);
+            margin-bottom: 10px;
+            font-size: 2rem;
+        }
+
+        .login-box p {
+            color: var(--text-light);
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(106, 17, 203, 0.4);
+        }
+
+        .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            background-color: rgba(244, 67, 54, 0.1);
+            color: var(--danger);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid var(--danger);
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        /* Main App Styles */
+        .app-container {
+            display: none;
+        }
+
+        .app-container.show {
+            display: block;
+        }
+
         .container {
             max-width: 1200px;
-            /* CENTERING: This ensures the entire content block is centered */
-            margin: 0 auto; 
+            margin: 0 auto;
             padding: 20px;
         }
 
@@ -49,12 +151,13 @@
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
             color: white;
-            padding: 20px 0;
+            padding: 20px;
             text-align: center;
             border-radius: 20px;
             margin-bottom: 30px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.18);
+            position: relative;
         }
 
         header h1 {
@@ -68,12 +171,48 @@
             opacity: 0.9;
         }
 
+        .logout-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: white;
+            color: var(--primary);
+        }
+
+        .debug-panel {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .debug-panel h3 {
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
         .dashboard {
             display: grid;
-            /* SIZING: Ensures cards are equal size (width) and fill space evenly */
-            grid-template-columns: repeat(2, 1fr); 
+            grid-template-columns: repeat(2, 1fr);
             gap: 20px;
-            /* SIZING: Ensures equal height for direct children (cards) in the grid, though content length will cause minor differences */
             align-items: stretch;
         }
 
@@ -85,8 +224,7 @@
             transition: transform 0.3s ease, box-shadow 0.3s ease;
             position: relative;
             overflow: hidden;
-            /* Setting a minimum height for visual stability on load */
-            min-height: 250px; 
+            min-height: 250px;
         }
 
         .card::before {
@@ -144,8 +282,7 @@
         }
 
         #map-container {
-            /* Ensures the map spans the full width of the dashboard grid */
-            grid-column: 1 / -1; 
+            grid-column: 1 / -1;
             height: 500px;
             border-radius: 20px;
             overflow: hidden;
@@ -199,7 +336,7 @@
             color: var(--text-light);
             font-style: italic;
         }
-        
+
         .battery-container {
             width: 60px;
             height: 30px;
@@ -263,7 +400,6 @@
             border: 2px solid var(--warning);
         }
 
-        /* Styles for the Center Map Button */
         .leaflet-control-center-location a {
             font-size: 18px;
             text-align: center;
@@ -282,24 +418,27 @@
             color: var(--primary);
         }
 
-        /* --- Media Queries --- */
         @media (max-width: 768px) {
             .dashboard {
-                /* Ensures cards stack when screen is too small */
-                grid-template-columns: 1fr; 
+                grid-template-columns: 1fr;
             }
-            
+
             #map-container {
-                /* MODIFIED: Increased height for better mobile viewing */
-                height: 450px; 
+                height: 450px;
             }
-            
+
             header h1 {
                 font-size: 2rem;
             }
-            
+
             .card {
                 padding: 20px;
+            }
+
+            .logout-btn {
+                position: static;
+                display: block;
+                margin: 15px auto 0;
             }
         }
 
@@ -307,63 +446,117 @@
             .container {
                 padding: 10px;
             }
-            
+
             header {
-                padding: 15px 0;
+                padding: 15px;
                 border-radius: 15px;
             }
-            
+
             header h1 {
                 font-size: 1.8rem;
             }
-            
+
             .card h2 {
                 font-size: 1.3rem;
+            }
+
+            .login-box {
+                padding: 30px 20px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1><i class="fas fa-map-marker-alt"></i> Live Location Tracker</h1>
-            <p>Real-time tracking and data visualization</p>
-        </header>
-
-        <div class="dashboard">
-            <div class="card">
-                <h2><i class="fas fa-map-pin"></i> Location Details</h2>
-                <div id="location-info">
-                    <div class="loading">
-                        Loading location data...<br>
-                        <i class="fas fa-spinner fa-pulse"></i>
-                        <br><br><br><br><br>
-                    </div>
+    <!-- Login Screen -->
+    <div class="login-container" id="loginScreen">
+        <div class="login-box">
+            <h1><i class="fas fa-lock"></i> Secure Access</h1>
+            <p>Enter credentials to view location tracker</p>
+            
+            <div class="error-message" id="errorMessage"></div>
+            
+            <form id="loginForm">
+                <div class="input-group">
+                    <label for="email"><i class="fas fa-envelope"></i> Email</label>
+                    <input type="email" id="email" required autocomplete="email">
                 </div>
-            </div>
-
-            <div class="card">
-                <h2><i class="fas fa-battery-three-quarters"></i> Device Status</h2>
-                <div id="device-info">
-                    <div class="loading">
-                        Loading device information...<br>
-                        <i class="fas fa-spinner fa-pulse"></i>
-                        <br><br>
-                    </div>
+                <div class="input-group">
+                    <label for="password"><i class="fas fa-key"></i> Password</label>
+                    <input type="password" id="password" required autocomplete="current-password">
                 </div>
-            </div>
-
-            <div id="map-container">
-                <div id="map"></div>
-            </div>
+                <button type="submit" class="login-btn" id="loginBtn">
+                    <i class="fas fa-sign-in-alt"></i> Sign In
+                </button>
+            </form>
         </div>
+    </div>
 
-        <div class="last-update" id="last-update">
-            Last updated: --
+    <!-- Main App (hidden until authenticated) -->
+    <div class="app-container" id="appContainer">
+        <div class="container">
+            <header>
+                <h1><i class="fas fa-map-marker-alt"></i> Live Location Tracker</h1>
+                <p>Real-time tracking and data visualization</p>
+                <button class="logout-btn" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </header>
+
+            <!-- Debug Panel -->
+            <div class="debug-panel" id="debugPanel">
+                <h3><i class="fas fa-bug"></i> Debug Console</h3>
+                <div id="debugOutput">Initializing...</div>
+            </div>
+
+            <div class="dashboard">
+                <div class="card">
+                    <h2><i class="fas fa-map-pin"></i> Location Details</h2>
+                    <div id="location-info">
+                        <div class="loading">
+                            Loading location data...<br>
+                            <i class="fas fa-spinner fa-pulse"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2><i class="fas fa-battery-three-quarters"></i> Device Status</h2>
+                    <div id="device-info">
+                        <div class="loading">
+                            Loading device information...<br>
+                            <i class="fas fa-spinner fa-pulse"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="map-container">
+                    <div id="map"></div>
+                </div>
+            </div>
+
+            <div class="last-update" id="last-update">
+                Last updated: --
+            </div>
         </div>
     </div>
 
     <script>
+        // Debug logging function
+        const debugLogs = [];
+        function debugLog(message, data = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            debugLogs.push(logEntry);
+            
+            console.log(message, data || '');
+            
+            const debugOutput = document.getElementById('debugOutput');
+            if (debugOutput) {
+                debugOutput.innerHTML = debugLogs.slice(-15).join('<br>');
+                debugOutput.scrollTop = debugOutput.scrollHeight;
+            }
+        }
+
         // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyD8uuorPjc2KhPvRAhWJTyFneCQfK3SPkA",
@@ -377,81 +570,185 @@
         };
 
         // Initialize Firebase
+        debugLog('Initializing Firebase...');
         const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
         const database = firebase.database();
+        debugLog('Firebase initialized successfully');
 
         // Home location coordinates
         const HOME_LOCATION = {
             latitude: 40.477583,
             longitude: -3.708096
         };
-        const HOME_RADIUS = 50; // meters
+        const HOME_RADIUS = 50;
 
         // Global variables
         let latestLocation = null;
         let mapCenteredOnFirstLocation = false;
         let offlineTimer = null;
         let currentSessionId = null;
-        const OFFLINE_THRESHOLD = 30000; // 30 seconds without updates = offline
-
-        // Initialize map
-        let map = L.map('map').setView([HOME_LOCATION.latitude, HOME_LOCATION.longitude], 12); 
+        let locationListener = null;
+        const OFFLINE_THRESHOLD = 30000;
+        let map = null;
         let marker = null;
         let circle = null;
         let homeMarker = null;
 
-        // Add tile layer to map
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        // UI Elements
+        const loginScreen = document.getElementById('loginScreen');
+        const appContainer = document.getElementById('appContainer');
+        const loginForm = document.getElementById('loginForm');
+        const loginBtn = document.getElementById('loginBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const errorMessage = document.getElementById('errorMessage');
 
-        // Add home marker to map
-        homeMarker = L.marker([HOME_LOCATION.latitude, HOME_LOCATION.longitude])
-            .addTo(map)
-            .bindPopup('Home Location')
-            .openPopup();
-        
-        // Add home radius circle
-        L.circle([HOME_LOCATION.latitude, HOME_LOCATION.longitude], {
-            color: 'green',
-            fillColor: '#30ff30',
-            fillOpacity: 0.2,
-            radius: HOME_RADIUS
-        }).addTo(map);
-
-        // --- Custom Control for Centering Map ---
-        const CenterControl = L.Control.extend({
-            onAdd: function(map) {
-                const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-center-location');
-                const button = L.DomUtil.create('a', 'leaflet-bar-part', container);
-                button.innerHTML = '<i class="fas fa-location-arrow"></i>';
-                button.href = '#';
-                button.title = 'Center Map to Current Location';
-
-                L.DomEvent.disableClickPropagation(button);
-                L.DomEvent.on(button, 'click', this._centerMap, this);
-
-                return container;
-            },
-
-            _centerMap: function(e) {
-                L.DomEvent.stop(e);
-                if (latestLocation && latestLocation.latitude && latestLocation.longitude) {
-                    // Center the map and zoom in to a reasonable level if it's currently zoomed out
-                    map.setView([latestLocation.latitude, latestLocation.longitude], map.getZoom() < 15 ? 15 : map.getZoom());
-                } else {
-                    alert('Location data is not available yet.');
-                }
+        // Authentication State Observer
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                debugLog('User authenticated:', user.email);
+                showApp();
+            } else {
+                debugLog('User not authenticated');
+                showLogin();
             }
         });
 
-        // Add the custom control to the map
-        map.addControl(new CenterControl({ position: 'topright' }));
-        // --- End Custom Control ---
+        // Login Form Handler
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Signing in...';
+            hideError();
+            debugLog(`Attempting login with email: ${email}`);
 
-        // Function to calculate distance between two coordinates using Haversine formula
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                debugLog('Login successful');
+            } catch (error) {
+                debugLog('Login error:', error.code);
+                console.error('Login error:', error);
+                let errorText = 'Invalid credentials. Please try again.';
+                
+                if (error.code === 'auth/user-not-found') {
+                    errorText = 'No account found with this email.';
+                } else if (error.code === 'auth/wrong-password') {
+                    errorText = 'Incorrect password.';
+                } else if (error.code === 'auth/invalid-email') {
+                    errorText = 'Invalid email format.';
+                } else if (error.code === 'auth/too-many-requests') {
+                    errorText = 'Too many failed attempts. Try again later.';
+                } else if (error.code === 'auth/invalid-credential') {
+                    errorText = 'Invalid credentials. Please check your email and password.';
+                }
+                
+                showError(errorText);
+                loginBtn.disabled = false;
+                loginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+            }
+        });
+
+        // Logout Handler
+        logoutBtn.addEventListener('click', async () => {
+            try {
+                debugLog('Logging out...');
+                
+                // Clean up listeners
+                if (locationListener) {
+                    database.ref(`sessions/${currentSessionId}/locations`).off('value', locationListener);
+                }
+                
+                await auth.signOut();
+                debugLog('Logout successful');
+            } catch (error) {
+                debugLog('Logout error:', error);
+                console.error('Logout error:', error);
+            }
+        });
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.classList.add('show');
+        }
+
+        function hideError() {
+            errorMessage.classList.remove('show');
+        }
+
+        function showLogin() {
+            loginScreen.style.display = 'flex';
+            appContainer.classList.remove('show');
+        }
+
+        function showApp() {
+            loginScreen.style.display = 'none';
+            appContainer.classList.add('show');
+            initializeMap();
+            setTimeout(() => {
+                findAndListenToActiveSessions();
+            }, 500);
+        }
+
+        function initializeMap() {
+            if (map) {
+                debugLog('Map already initialized');
+                return;
+            }
+
+            debugLog('Initializing map...');
+            map = L.map('map').setView([HOME_LOCATION.latitude, HOME_LOCATION.longitude], 12);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            homeMarker = L.marker([HOME_LOCATION.latitude, HOME_LOCATION.longitude])
+                .addTo(map)
+                .bindPopup('Home Location');
+
+            L.circle([HOME_LOCATION.latitude, HOME_LOCATION.longitude], {
+                color: 'green',
+                fillColor: '#30ff30',
+                fillOpacity: 0.2,
+                radius: HOME_RADIUS
+            }).addTo(map);
+
+            const CenterControl = L.Control.extend({
+                onAdd: function(map) {
+                    const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-center-location');
+                    const button = L.DomUtil.create('a', 'leaflet-bar-part', container);
+                    button.innerHTML = '<i class="fas fa-location-arrow"></i>';
+                    button.href = '#';
+                    button.title = 'Center Map to Current Location';
+
+                    L.DomEvent.disableClickPropagation(button);
+                    L.DomEvent.on(button, 'click', this._centerMap, this);
+
+                    return container;
+                },
+
+                _centerMap: function(e) {
+                    L.DomEvent.stop(e);
+                    if (latestLocation && latestLocation.latitude && latestLocation.longitude) {
+                        map.setView([latestLocation.latitude, latestLocation.longitude], map.getZoom() < 15 ? 15 : map.getZoom());
+                        debugLog('Map centered to current location');
+                    } else {
+                        alert('Location data is not available yet.');
+                        debugLog('Cannot center map - no location data');
+                    }
+                }
+            });
+
+            map.addControl(new CenterControl({ position: 'topright' }));
+            debugLog('Map initialized successfully');
+        }
+
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371000; // Earth's radius in meters
+            const R = 6371000;
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = 
@@ -459,22 +756,15 @@
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             const distance = R * c;
-            return distance; // Returns distance in meters
+            return distance;
         }
 
-        // Function to check if current location is within home area
         function isAtHome(latitude, longitude) {
             if (!latitude || !longitude) return false;
-            
-            const distance = calculateDistance(
-                latitude, longitude, 
-                HOME_LOCATION.latitude, HOME_LOCATION.longitude
-            );
-            
+            const distance = calculateDistance(latitude, longitude, HOME_LOCATION.latitude, HOME_LOCATION.longitude);
             return distance <= HOME_RADIUS;
         }
 
-        // Function to update the map with new location (only moves marker/circle)
         function updateMap(latitude, longitude, accuracy) {
             const newLatLng = new L.LatLng(latitude, longitude);
             
@@ -498,65 +788,44 @@
             }
         }
 
-        // Function to format data for display
         function formatData(data) {
-            if (data === null || data === undefined) {
-                return 'N/A';
-            }
-            if (typeof data === 'object') {
-                return JSON.stringify(data, null, 2);
-            }
-            // Ensure numbers are rounded for display clarity
-            if (typeof data === 'number') {
-                 return parseFloat(data.toFixed(2));
-            }
+            if (data === null || data === undefined) return 'N/A';
+            if (typeof data === 'object') return JSON.stringify(data, null, 2);
+            if (typeof data === 'number') return parseFloat(data.toFixed(2));
             return data;
         }
 
-        // Function to format timestamp
         function formatTimestamp(timestamp) {
             if (!timestamp) return 'N/A';
             const date = new Date(timestamp);
             return date.toLocaleString();
         }
 
-        // Function to reset the offline timer
         function resetOfflineTimer() {
-            // Clear existing timer
             if (offlineTimer) {
                 clearTimeout(offlineTimer);
             }
             
-            // Set new timer to mark as offline if no updates received
             offlineTimer = setTimeout(() => {
-                // Force a UI update to reflect the new offline status in the Device Status card
                 if (latestLocation) {
-                    updateUI(latestLocation); 
+                    debugLog('Device appears offline (no update in 30s)');
+                    updateUI(latestLocation);
                 }
             }, OFFLINE_THRESHOLD);
         }
 
-        // Function to update the UI with location data
         function updateUI(locationData) {
-            console.log('Updating UI with:', locationData);
-
-            // Store the latest location data globally for the center button and offline status update
+            debugLog('Updating UI with location data');
             latestLocation = locationData;
-
-            // Reset offline timer every time new data arrives.
             resetOfflineTimer();
             
-            // Speed value from Firebase, assumed to be in km/h
             const speedKmh = locationData.speed || 0;
             const speedDisplay = formatData(speedKmh);
-
-            // Check if location is at home
             const atHome = isAtHome(locationData.latitude, locationData.longitude);
             const locationStatus = atHome ? 
                 '<span class="location-status location-home"><i class="fas fa-home"></i> Home</span>' : 
                 '<span class="location-status location-outside"><i class="fas fa-external-link-alt"></i> Outside</span>';
 
-            // --- Distance from Home Calculation (m to km) ---
             let distanceFromHome = 'N/A';
             if (locationData.latitude && locationData.longitude) {
                 const distanceMeters = calculateDistance(
@@ -572,10 +841,8 @@
                 }
             }
 
-            // Check if device is online based on timestamp
             const isOnline = locationData.timestamp && (Date.now() - locationData.timestamp) < OFFLINE_THRESHOLD;
 
-            // Update location information (7 data items: Position + Movement + Status)
             const locationInfo = document.getElementById('location-info');
             locationInfo.innerHTML = `
                 <div class="data-item">
@@ -608,7 +875,6 @@
                 </div>
             `;
 
-            // Update device information (5 data items: Time + Hardware Status)
             const deviceInfo = document.getElementById('device-info');
             deviceInfo.innerHTML = `
                 <div class="data-item">
@@ -642,84 +908,113 @@
                 </div>
             `;
 
-            // Update map if we have valid location data
             if (locationData.latitude && locationData.longitude && locationData.gpsFix) {
-                updateMap(
-                    locationData.latitude, 
-                    locationData.longitude, 
-                    locationData.accuracy || 50 // Default accuracy if not provided
-                );
+                updateMap(locationData.latitude, locationData.longitude, locationData.accuracy || 50);
                 
-                // --- Initial Map Centering Logic ---
                 if (!mapCenteredOnFirstLocation) {
-                    // Zoom to 15 for a good street-level view
                     map.setView([locationData.latitude, locationData.longitude], 15);
                     mapCenteredOnFirstLocation = true;
+                    debugLog('Map auto-centered to first location');
                 }
-                // --- End Initial Map Centering Logic ---
             }
 
-            // Update last update time (the external footer element)
             document.getElementById('last-update').textContent = `Last updated: ${new Date().toLocaleString()}`;
         }
 
-        // Find and listen to active sessions - UPDATED TO GET MOST RECENT SESSION
         function findAndListenToActiveSessions() {
-            console.log('Looking for active sessions...');
+            debugLog('Starting to listen for sessions...');
             
-            database.ref('sessions').orderByChild('lastUpdate').on('value', (sessionsSnapshot) => {
-                const sessions = sessionsSnapshot.val();
-                
-                if (!sessions) {
-                    // If no sessions, display a general "no data" message
-                    document.getElementById('location-info').innerHTML = '<div class="no-data">No active sessions or data found.</div>';
-                    document.getElementById('device-info').innerHTML = '<div class="no-data">No active sessions or data found.</div>';
-                    return;
-                }
-
-                // Find the session with the most recent lastUpdate timestamp
-                let mostRecentSessionId = null;
-                let mostRecentTimestamp = 0;
-                
-                Object.keys(sessions).forEach(sessionId => {
-                    const sessionData = sessions[sessionId];
-                    if (sessionData.lastUpdate && sessionData.lastUpdate > mostRecentTimestamp) {
-                        mostRecentTimestamp = sessionData.lastUpdate;
-                        mostRecentSessionId = sessionId;
-                    }
-                });
-
-                if (mostRecentSessionId) {
-                    console.log('Found most recent session:', mostRecentSessionId);
+            database.ref('sessions').once('value')
+                .then((sessionsSnapshot) => {
+                    const sessions = sessionsSnapshot.val();
+                    debugLog('Sessions snapshot received', sessions ? Object.keys(sessions).length + ' sessions found' : 'No sessions');
                     
-                    // Start listening to locations for the most recent session
-                    listenToSessionLocations(mostRecentSessionId);
-                } else {
-                    document.getElementById('location-info').innerHTML = '<div class="no-data">No active sessions or data found.</div>';
-                    document.getElementById('device-info').innerHTML = '<div class="no-data">No active sessions or data found.</div>';
-                }
-            });
+                    if (!sessions) {
+                        debugLog('No sessions found in database');
+                        document.getElementById('location-info').innerHTML = '<div class="no-data">No active sessions found. Make sure the mobile app is running and sending data.</div>';
+                        document.getElementById('device-info').innerHTML = '<div class="no-data">No active sessions found.</div>';
+                        return;
+                    }
+
+                    let mostRecentSessionId = null;
+                    let mostRecentTimestamp = 0;
+                    
+                    Object.keys(sessions).forEach(sessionId => {
+                        const sessionData = sessions[sessionId];
+                        debugLog(`Session ${sessionId}: lastUpdate=${sessionData.lastUpdate}`);
+                        if (sessionData.lastUpdate && sessionData.lastUpdate > mostRecentTimestamp) {
+                            mostRecentTimestamp = sessionData.lastUpdate;
+                            mostRecentSessionId = sessionId;
+                        }
+                    });
+
+                    debugLog(`Most recent session: ${mostRecentSessionId} (timestamp: ${mostRecentTimestamp})`);
+
+                    if (mostRecentSessionId) {
+                        listenToSessionLocations(mostRecentSessionId);
+                    } else {
+                        debugLog('No sessions with lastUpdate timestamp found');
+                        document.getElementById('location-info').innerHTML = '<div class="no-data">No active sessions found.</div>';
+                        document.getElementById('device-info').innerHTML = '<div class="no-data">No active sessions found.</div>';
+                    }
+                })
+                .catch((error) => {
+                    debugLog('Error reading sessions: ' + error.message);
+                    console.error('Error reading sessions:', error);
+                    document.getElementById('location-info').innerHTML = `<div class="no-data">Error loading data: ${error.message}<br>Check console for details.</div>`;
+                    document.getElementById('device-info').innerHTML = `<div class="no-data">Error loading data: ${error.message}</div>`;
+                });
         }
 
-        // Listen to location updates in a specific session
         function listenToSessionLocations(sessionId) {
-            console.log('Listening to session:', sessionId);
+            debugLog(`Setting up listener for session: ${sessionId}`);
+            currentSessionId = sessionId;
             
-            // Listen for the latest location only (since only the latest point matters for the map)
-            database.ref(`sessions/${sessionId}/locations`).orderByKey().limitToLast(1).on('value', (locationSnapshot) => {
+            const locationsRef = database.ref(`sessions/${sessionId}/locations`);
+            
+            // First, check if there's any data
+            locationsRef.once('value')
+                .then((snapshot) => {
+                    const data = snapshot.val();
+                    debugLog('Initial locations check', data ? 'Data exists' : 'No data yet');
+                    
+                    if (!data) {
+                        document.getElementById('location-info').innerHTML = '<div class="no-data">Session found but no location data yet. Waiting for updates...</div>';
+                        document.getElementById('device-info').innerHTML = '<div class="no-data">Waiting for device data...</div>';
+                    }
+                })
+                .catch((error) => {
+                    debugLog('Error checking locations: ' + error.message);
+                });
+            
+            // Set up real-time listener
+            locationListener = locationsRef.orderByKey().limitToLast(1).on('value', (locationSnapshot) => {
                 const locations = locationSnapshot.val();
+                
                 if (locations) {
                     const latestLocationKey = Object.keys(locations)[0];
                     const latestLocation = locations[latestLocationKey];
-                    console.log('Latest location:', latestLocation);
+                    debugLog('Location update received', `Key: ${latestLocationKey}`);
+                    debugLog('Location data', JSON.stringify(latestLocation).substring(0, 100));
                     updateUI(latestLocation);
+                } else {
+                    debugLog('Locations snapshot is empty');
                 }
+            }, (error) => {
+                debugLog('Error in location listener: ' + error.message);
+                console.error('Error reading locations:', error);
+                document.getElementById('location-info').innerHTML = `<div class="no-data">Error loading locations: ${error.message}<br>Possible permission issue.</div>`;
+                document.getElementById('device-info').innerHTML = `<div class="no-data">Error loading locations: ${error.message}</div>`;
             });
         }
 
-        // Initialize the application
-        document.addEventListener('DOMContentLoaded', () => {
-            findAndListenToActiveSessions();
+        // Test database connection on load
+        database.ref('.info/connected').on('value', (snapshot) => {
+            if (snapshot.val() === true) {
+                debugLog('✓ Connected to Firebase Database');
+            } else {
+                debugLog('✗ Disconnected from Firebase Database');
+            }
         });
     </script>
 </body>
