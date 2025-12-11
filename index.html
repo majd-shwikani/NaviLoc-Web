@@ -921,50 +921,70 @@
             document.getElementById('last-update').textContent = `Last updated: ${new Date().toLocaleString()}`;
         }
 
-        function findAndListenToActiveSessions() {
-            debugLog('Starting to listen for sessions...');
+function findAndListenToActiveSessions() {
+    debugLog('Starting to listen for sessions...');
+    
+    // Set up real-time listener on sessions
+    const sessionsRef = database.ref('sessions');
+    
+    sessionsRef.on('value', (sessionsSnapshot) => {
+        const sessions = sessionsSnapshot.val();
+        debugLog('Sessions updated', sessions ? Object.keys(sessions).length + ' sessions found' : 'No sessions');
+        
+        if (!sessions) {
+            debugLog('No sessions found in database');
+            document.getElementById('location-info').innerHTML = '<div class="no-data">No active sessions found. Make sure the mobile app is running and sending data.</div>';
+            document.getElementById('device-info').innerHTML = '<div class="no-data">No active sessions found.</div>';
             
-            database.ref('sessions').once('value')
-                .then((sessionsSnapshot) => {
-                    const sessions = sessionsSnapshot.val();
-                    debugLog('Sessions snapshot received', sessions ? Object.keys(sessions).length + ' sessions found' : 'No sessions');
-                    
-                    if (!sessions) {
-                        debugLog('No sessions found in database');
-                        document.getElementById('location-info').innerHTML = '<div class="no-data">No active sessions found. Make sure the mobile app is running and sending data.</div>';
-                        document.getElementById('device-info').innerHTML = '<div class="no-data">No active sessions found.</div>';
-                        return;
-                    }
-
-                    let mostRecentSessionId = null;
-                    let mostRecentTimestamp = 0;
-                    
-                    Object.keys(sessions).forEach(sessionId => {
-                        const sessionData = sessions[sessionId];
-                        debugLog(`Session ${sessionId}: lastUpdate=${sessionData.lastUpdate}`);
-                        if (sessionData.lastUpdate && sessionData.lastUpdate > mostRecentTimestamp) {
-                            mostRecentTimestamp = sessionData.lastUpdate;
-                            mostRecentSessionId = sessionId;
-                        }
-                    });
-
-                    debugLog(`Most recent session: ${mostRecentSessionId} (timestamp: ${mostRecentTimestamp})`);
-
-                    if (mostRecentSessionId) {
-                        listenToSessionLocations(mostRecentSessionId);
-                    } else {
-                        debugLog('No sessions with lastUpdate timestamp found');
-                        document.getElementById('location-info').innerHTML = '<div class="no-data">No active sessions found.</div>';
-                        document.getElementById('device-info').innerHTML = '<div class="no-data">No active sessions found.</div>';
-                    }
-                })
-                .catch((error) => {
-                    debugLog('Error reading sessions: ' + error.message);
-                    console.error('Error reading sessions:', error);
-                    document.getElementById('location-info').innerHTML = `<div class="no-data">Error loading data: ${error.message}<br>Check console for details.</div>`;
-                    document.getElementById('device-info').innerHTML = `<div class="no-data">Error loading data: ${error.message}</div>`;
-                });
+            // Clean up existing listener if no sessions
+            if (locationListener) {
+                database.ref(`sessions/${currentSessionId}/locations`).off('value', locationListener);
+                locationListener = null;
+                currentSessionId = null;
+            }
+            return;
         }
+
+        let mostRecentSessionId = null;
+        let mostRecentTimestamp = 0;
+        
+        Object.keys(sessions).forEach(sessionId => {
+            const sessionData = sessions[sessionId];
+            debugLog(`Session ${sessionId}: lastUpdate=${sessionData.lastUpdate}`);
+            if (sessionData.lastUpdate && sessionData.lastUpdate > mostRecentTimestamp) {
+                mostRecentTimestamp = sessionData.lastUpdate;
+                mostRecentSessionId = sessionId;
+            }
+        });
+
+        debugLog(`Most recent session: ${mostRecentSessionId} (timestamp: ${mostRecentTimestamp})`);
+
+        // Only switch to new session if it's different from current
+        if (mostRecentSessionId && mostRecentSessionId !== currentSessionId) {
+            debugLog(`Switching to new session: ${mostRecentSessionId}`);
+            
+            // Clean up previous listener
+            if (locationListener && currentSessionId) {
+                database.ref(`sessions/${currentSessionId}/locations`).off('value', locationListener);
+                debugLog(`Cleaned up listener for old session: ${currentSessionId}`);
+            }
+            
+            // Set up listener for new session
+            listenToSessionLocations(mostRecentSessionId);
+        } else if (mostRecentSessionId && mostRecentSessionId === currentSessionId) {
+            debugLog(`Already listening to current session: ${mostRecentSessionId}`);
+        } else {
+            debugLog('No active sessions found');
+            document.getElementById('location-info').innerHTML = '<div class="no-data">No active sessions found.</div>';
+            document.getElementById('device-info').innerHTML = '<div class="no-data">No active sessions found.</div>';
+        }
+    }, (error) => {
+        debugLog('Error in sessions listener: ' + error.message);
+        console.error('Error reading sessions:', error);
+        document.getElementById('location-info').innerHTML = `<div class="no-data">Error loading sessions: ${error.message}<br>Check console for details.</div>`;
+        document.getElementById('device-info').innerHTML = `<div class="no-data">Error loading sessions: ${error.message}</div>`;
+    });
+}
 
         function listenToSessionLocations(sessionId) {
             debugLog(`Setting up listener for session: ${sessionId}`);
