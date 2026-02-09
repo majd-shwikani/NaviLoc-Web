@@ -274,26 +274,30 @@
             font-weight: 600;
             margin: 0;
             color: var(--text-main);
+            white-space: nowrap;
+        }
+
+        .badge-home, .badge-away {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
 
         .badge-home {
             background: rgba(0, 242, 96, 0.15);
-            color: #008736;
+            color: #00f260;
             border: 1px solid #00f260;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
         }
         
         .badge-away {
             background: rgba(255, 152, 0, 0.15);
-            color: #F57C00;
+            color: #FF9800;
             border: 1px solid #FF9800;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
         }
 
         .btn-icon {
@@ -309,6 +313,7 @@
             transition: all 0.2s;
             cursor: pointer;
             box-shadow: var(--card-shadow);
+            pointer-events: auto;
         }
 
         .btn-icon:hover {
@@ -352,9 +357,51 @@
         }
 
         @media (max-width: 768px) {
+            .ui-layer {
+                padding: 10px;
+            }
             .stats-container {
-                grid-template-columns: 1fr 1fr;
-                bottom: 80px;
+                grid-template-columns: repeat(2, 1fr);
+                bottom: 20px;
+                gap: 8px;
+                display: grid;
+            }
+            
+            /* Rearrange for Mobile */
+            #card-coords { order: 1; grid-column: span 2; } /* Full width coordinates top */
+            #card-distance { order: 2; }
+            #card-speed { order: 3; }
+            #card-location { order: 4; } /* Location under Speed */
+            #card-battery { order: 5; }  /* Battery next to Location */
+
+            .stat-card {
+                padding: 10px;
+                gap: 8px;
+            }
+            .stat-icon {
+                width: 32px;
+                height: 32px;
+                font-size: 0.9rem;
+            }
+            .stat-info h6 {
+                font-size: 0.6rem;
+            }
+            .stat-info .value {
+                font-size: 0.85rem;
+            }
+            .badge-home, .badge-away {
+                padding: 3px 8px;
+                font-size: 0.65rem;
+            }
+            .top-bar {
+                margin-bottom: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            /* Keep 2 columns but ensure order is maintained */
+            .stats-container {
+                grid-template-columns: repeat(2, 1fr);
             }
         }
     </style>
@@ -420,7 +467,7 @@
             <!-- Floating Stats (Bottom) -->
             <div class="stats-container">
                 <!-- Location Status -->
-                <div class="stat-card">
+                <div class="stat-card" id="card-location">
                     <div class="stat-icon"><i class="fas fa-map-marker-alt"></i></div>
                     <div class="stat-info">
                         <h6>Location</h6>
@@ -431,7 +478,7 @@
                 </div>
 
                 <!-- Coordinates (Emergency) -->
-                <div class="stat-card">
+                <div class="stat-card" id="card-coords">
                     <div class="stat-icon"><i class="fas fa-globe"></i></div>
                     <div class="stat-info">
                         <h6>Coordinates (GPS)</h6>
@@ -443,7 +490,7 @@
                 </div>
 
                 <!-- Distance -->
-                <div class="stat-card">
+                <div class="stat-card" id="card-distance">
                     <div class="stat-icon"><i class="fas fa-ruler"></i></div>
                     <div class="stat-info">
                         <h6>From Home</h6>
@@ -452,7 +499,7 @@
                 </div>
 
                 <!-- Speed -->
-                <div class="stat-card">
+                <div class="stat-card" id="card-speed">
                     <div class="stat-icon"><i class="fas fa-tachometer-alt"></i></div>
                     <div class="stat-info">
                         <h6>Speed</h6>
@@ -461,7 +508,7 @@
                 </div>
 
                 <!-- Battery -->
-                <div class="stat-card">
+                <div class="stat-card" id="card-battery">
                     <div class="stat-icon"><i class="fas fa-battery-half"></i></div>
                     <div class="stat-info">
                         <h6>Battery</h6>
