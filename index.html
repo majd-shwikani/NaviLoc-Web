@@ -121,17 +121,32 @@
         }
 
         .form-control {
-            background: rgba(128, 128, 128, 0.1);
+            background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--glass-border);
-            color: var(--text-main);
+            color: var(--text-main) !important;
             padding: 12px 15px;
             border-radius: 12px;
         }
         
+        /* Ensure placeholders are visible */
+        .form-control::placeholder {
+            color: var(--text-muted);
+            opacity: 0.7;
+        }
+
+        /* Fix for browser autofill background/text color */
+        .form-control:-webkit-autofill,
+        .form-control:-webkit-autofill:hover, 
+        .form-control:-webkit-autofill:focus {
+            -webkit-text-fill-color: var(--text-main);
+            -webkit-box-shadow: 0 0 0px 1000px rgba(30, 30, 40, 0.9) inset;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+        
         .form-control:focus {
-            background: rgba(128, 128, 128, 0.2);
+            background: rgba(255, 255, 255, 0.1);
             border-color: var(--neon-accent);
-            color: var(--text-main);
+            color: var(--text-main) !important;
             box-shadow: 0 0 0 4px rgba(0, 242, 96, 0.1);
         }
 
@@ -484,6 +499,26 @@
         const auth = firebase.auth();
         const database = firebase.database();
 
+        // --- Theme Logic (Moved up to initialize early) ---
+        function updateTheme() {
+            const hour = new Date().getHours();
+            const isDay = hour >= 7 && hour < 20;
+            const theme = isDay ? 'light' : 'dark';
+            
+            document.body.setAttribute('data-theme', theme);
+            if (map) updateMapTiles(theme);
+        }
+
+        function initTheme() {
+            updateTheme();
+            setInterval(() => {
+                if (!manualThemeOverride) updateTheme();
+            }, 60000);
+        }
+
+        // Initialize Theme immediately
+        initTheme();
+
         // --- Auth Listener ---
         auth.onAuthStateChanged(user => {
             if (user) {
@@ -491,31 +526,11 @@
                 document.getElementById('appContainer').style.display = 'block';
                 initMap();
                 listenToSessions();
-                initTheme();
             } else {
                 document.getElementById('loginScreen').style.display = 'flex';
                 document.getElementById('appContainer').style.display = 'none';
             }
         });
-
-        // --- Theme Logic ---
-        function initTheme() {
-            updateTheme();
-            // Check theme every minute
-            setInterval(() => {
-                if (!manualThemeOverride) updateTheme();
-            }, 60000);
-        }
-
-        function updateTheme() {
-            const hour = new Date().getHours();
-            // Day is roughly 7 AM to 8 PM (20:00)
-            const isDay = hour >= 7 && hour < 20;
-            const theme = isDay ? 'light' : 'dark';
-            
-            document.body.setAttribute('data-theme', theme);
-            updateMapTiles(theme);
-        }
 
         function updateMapTiles(theme) {
             if (!map) return;
